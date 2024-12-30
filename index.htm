@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-signin-client_id" content="147934510488-allie69121uoboqbr26nhql7u0205res.apps.googleusercontent.com">
+    <title>File Uploader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        File Uploader with Google Drive Integration
+    </header>
+    <div class="container">
+        <!-- Google Sign-In Button -->
+        <div class="g_id_signin"></div>
+
+        <!-- File Selection Section -->
+        <input type="file" id="fileInput" multiple style="display: none;">
+        <button id="deleteSelectedBtn" style="display: none;">Delete Selected</button>
+        <button id="uploadBtn" disabled style="display: none;">Upload Files</button>
+
+        <!-- File List Display -->
+        <div id="fileList" class="file-list"></div>
+
+        <!-- Upload Status -->
+        <div id="uploadStatus"></div>
+    </div>
+
+    <!-- Include Google Platform Library -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Link to External JavaScript -->
+    <script src="script.js" defer></script>
+</body>
+</html>
