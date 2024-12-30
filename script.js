@@ -1,12 +1,21 @@
-// Google Sign-In Setup
 const clientId = "147934510488-allie69121uoboqbr26nhql7u0205res.apps.googleusercontent.com";
 
+// Google Sign-In Setup
 function handleCredentialResponse(response) {
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
     document.getElementById("fileInput").style.display = "block";
-    document.getElementById("deleteSelectedBtn").style.display = "inline-block";
-    document.getElementById("uploadBtn").style.display = "inline-block";
+    document.getElementById("deleteSelectedBtn").style.display = "block";
+    document.getElementById("uploadBtn").style.display = "block";
     document.getElementById("uploadStatus").innerText = `Welcome, ${payload.name}! Select files to upload.`;
+
+    // Initialize the gapi client
+    gapi.load("client:auth2", () => {
+        gapi.client.init({
+            apiKey: "YOUR_API_KEY", // Replace with your API key if necessary
+            clientId: clientId,
+            scope: "https://www.googleapis.com/auth/drive.file",
+        });
+    });
 }
 
 // Initialize Google Sign-In
@@ -24,13 +33,11 @@ window.onload = function () {
 
 // File Handling Variables
 let selectedFiles = [];
-const fileInput = document.getElementById("fileInput");
-const fileList = document.getElementById("fileList");
-const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
-const uploadBtn = document.getElementById("uploadBtn");
-const uploadStatus = document.getElementById("uploadStatus");
 
 // File Selection
+const fileInput = document.getElementById("fileInput");
+const fileList = document.getElementById("fileList");
+
 fileInput.addEventListener("change", () => {
     selectedFiles = Array.from(fileInput.files);
     displayFileList();
@@ -41,69 +48,55 @@ function displayFileList() {
     fileList.innerHTML = "";
     if (selectedFiles.length === 0) {
         fileList.innerText = "No files selected.";
-        uploadBtn.disabled = true;
         return;
     }
-    uploadBtn.disabled = false;
-
     selectedFiles.forEach((file, index) => {
         const fileItem = document.createElement("div");
         fileItem.className = "file-item";
         fileItem.innerHTML = `
-            <span>${file.name} (${(file.size / 1024).toFixed(2)} KB)</span>
-            <button class="delete-btn" data-index="${index}">Delete</button>
+            <input type="checkbox" id="file-${index}" data-index="${index}">
+            <label for="file-${index}">${file.name} (${(file.size / 1024).toFixed(2)} KB)</label>
         `;
         fileList.appendChild(fileItem);
-    });
-
-    document.querySelectorAll(".delete-btn").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-            const index = parseInt(e.target.getAttribute("data-index"));
-            selectedFiles.splice(index, 1);
-            displayFileList();
-        });
     });
 }
 
 // Delete Selected Files
-deleteSelectedBtn.addEventListener("click", () => {
-    selectedFiles = [];
+document.getElementById("deleteSelectedBtn").addEventListener("click", () => {
+    const selectedCheckboxes = document.querySelectorAll(".file-item input[type='checkbox']:checked");
+    selectedCheckboxes.forEach((checkbox) => {
+        const index = parseInt(checkbox.getAttribute("data-index"));
+        selectedFiles.splice(index, 1);
+    });
     displayFileList();
 });
 
 // Upload Files
-uploadBtn.addEventListener("click", async () => {
+document.getElementById("uploadBtn").addEventListener("click", async () => {
     if (selectedFiles.length === 0) {
-        alert("No files selected. Please choose files first.");
+        alert("No files to upload.");
         return;
     }
 
-    uploadStatus.innerHTML = "";
-    for (const file of selectedFiles) {
-        const progressBar = document.createElement("div");
-        progressBar.className = "progress-bar";
-        progressBar.innerHTML = `
-            <div class="progress-bar-inner" style="width: 0%;"></div>
-            <span>${file.name} - Uploading...</span>
-        `;
-        uploadStatus.appendChild(progressBar);
+    const uploadStatus = document.getElementById("uploadStatus");
+    uploadStatus.innerText = "Uploading files, please wait...";
 
+    for (const file of selectedFiles) {
         try {
-            await uploadFileToDrive(file, progressBar);
-            progressBar.querySelector(".progress-bar-inner").style.width = "100%";
-            progressBar.querySelector("span").innerText = `${file.name} - Upload complete!`;
+            await uploadFileToDrive(file);
+            uploadStatus.innerText = `${file.name} uploaded successfully!`;
         } catch (error) {
-            progressBar.querySelector("span").innerText = `${file.name} - Upload failed: ${error.message}`;
+            uploadStatus.innerText = `Error uploading ${file.name}: ${error.message}`;
         }
     }
-
-    selectedFiles = [];
+    uploadStatus.innerText = "All files uploaded!";
+    selectedFiles = []; // Clear file list after upload
     displayFileList();
 });
 
 // Google Drive Upload Function
-async function uploadFileToDrive(file, progressBar) {
-    const accessToken = gapi.auth.getToken().access_token;
+async function uploadFileToDrive(file) {
+    const token = gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token;
 
     const metadata = {
         name: file.name,
@@ -114,26 +107,13 @@ async function uploadFileToDrive(file, progressBar) {
     formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
     formData.append("file", file);
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", true);
-    xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
-
-    xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-            const percentComplete = (event.loaded / event.total) * 100;
-            progressBar.querySelector(".progress-bar-inner").style.width = `${percentComplete}%`;
-        }
-    };
-
-    return new Promise((resolve, reject) => {
-        xhr.onload = () => {
-            if (xhr.status === 200) {
-                resolve();
-            } else {
-                reject(new Error(xhr.statusText));
-            }
-        };
-        xhr.onerror = () => reject(new Error("Network Error"));
-        xhr.send(formData);
+    const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        method: "POST",
+        headers: new Headers({ Authorization: `Bearer ${token}` }),
+        body: formData,
     });
+
+    if (!response.ok) {
+        throw new Error("Upload failed");
+    }
 }
